@@ -218,12 +218,21 @@ function irACliente(p){
 async function buscarDireccion(txt){
   const ul=document.getElementById("res"); const li=ul.querySelector(".dir-li"); if(li) li.innerHTML='<span></span><span><small>Buscando la dirección…</small></span>';
   try{
-    const u="https://photon.komoot.io/api/?limit=1&lang=es&bbox=-58.95,-35.25,-57.95,-34.45&q="+encodeURIComponent(txt+", Buenos Aires");
-    const j=await (await fetch(u)).json(); const f=j.features&&j.features[0];
-    if(!f){ if(li) li.innerHTML='<span></span><span><small>No se encontró esa dirección en el mapa.</small></span>'; return; }
-    const [lo,la]=f.geometry.coordinates, p=f.properties, nom=[p.street||p.name,p.housenumber].filter(Boolean).join(" ")+", "+(p.city||p.district||p.county||"");
+    let la,lo,nom;
+    // 1) OpenStreetMap (Photon), limitado al conurbano sur
+    const j=await (await fetch("https://photon.komoot.io/api/?limit=1&bbox=-58.95,-35.25,-57.95,-34.45&q="+encodeURIComponent(txt))).json();
+    const f=j.features&&j.features[0];
+    if(f){ [lo,la]=f.geometry.coordinates; const p=f.properties; nom=[p.street||p.name,p.housenumber].filter(Boolean).join(" ")+", "+(p.city||p.district||p.county||""); }
+    else {
+      // 2) Registro oficial de calles (Georef); "calle altura, localidad"
+      const [dir,...resto]=txt.split(","), loc=resto.join(",").trim();
+      const g=await (await fetch("https://apis.datos.gob.ar/georef/api/direcciones?max=1&provincia=Buenos%20Aires&direccion="+encodeURIComponent(dir.trim())+(loc?"&departamento="+encodeURIComponent(loc):""))).json();
+      const d=g.direcciones&&g.direcciones.find(x=>x.ubicacion&&x.ubicacion.lat!=null);
+      if(d){ la=d.ubicacion.lat; lo=d.ubicacion.lon; nom=d.nomenclatura; }
+    }
+    if(la==null){ if(li) li.innerHTML='<span></span><span><small>No se encontró esa dirección. Probá con calle y altura, por ejemplo «Mitre 1729 Avellaneda».</small></span>'; return; }
     if(pinDir) map.removeLayer(pinDir);
-    pinDir=L.marker([la,lo]).bindPopup("<b>"+esc(nom)+"</b><br><small>Dirección buscada</small>").addTo(map).openPopup();
+    pinDir=L.marker([la,lo],{icon:L.divIcon({className:"",html:'<div style="font-size:30px;line-height:1;transform:translate(-50%,-100%)">📍</div>',iconSize:[0,0]})}).bindPopup("<b>"+esc(nom)+"</b><br><small>Dirección buscada</small>").addTo(map).openPopup();
     map.setView([la,lo],17,{animate:false}); resaltar(la,lo);
     if(li) li.innerHTML='<span></span><span class="dir">📍 '+esc(nom)+'</span>';
   }catch(e){ if(li) li.innerHTML='<span></span><span><small>No se pudo buscar la dirección (revisá la conexión a internet).</small></span>'; }
