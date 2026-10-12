@@ -156,6 +156,8 @@ function addBasemap(map) {
 const DATA = /*DATA*/;
 const VEND = /*VEND*/;
 const DAYS=[["Lu","Lunes"],["Ma","Martes"],["Mi","Miércoles"],["Ju","Jueves"],["Vi","Viernes"]];
+const TABS=[...DAYS,["T","Todos"]];
+const enDia=(r,d)=>d==="T"||r.dia===d;
 let day="Lu", hidden=new Set(), focus=null;
 const map=L.map("map").setView([-34.76,-58.33],11);
 addBasemap(map);
@@ -164,10 +166,10 @@ function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt
 // clientes distintos en la misma coordenada: se separan unos metros en el mapa para que se vean todos
 const SPREAD={};(()=>{const g={};for(const r of DATA){const k=r.la.toFixed(5)+","+r.lo.toFixed(5);(g[k]=g[k]||[]).push(r)}for(const k in g){const a=g[k];if(a.length<2)continue;a.forEach((r,i)=>{const ang=2*Math.PI*i/a.length,d=0.00012*Math.max(1,a.length/6);SPREAD[r.c]=[r.la+d*Math.sin(ang),r.lo+d*Math.cos(ang)*1.2]})}})();
 function pos(p){return SPREAD[p.c]||[p.la,p.lo]}
-function byVend(d){const o={};for(const r of DATA){if(r.dia!==d)continue;(o[r.v]=o[r.v]||[]).push(r)}return o}
+function byVend(d){const o={};for(const r of DATA){if(!enDia(r,d))continue;(o[r.v]=o[r.v]||[]).push(r)}return o}
 function renderTabs(){
   const tabs=document.getElementById("tabs");
-  tabs.innerHTML=DAYS.map(([k,v])=>`<button class="tab ${k===day?"on":""}" data-d="${k}">${v}<small>${DATA.filter(r=>r.dia===k).length} clientes</small></button>`).join("");
+  tabs.innerHTML=TABS.map(([k,v])=>`<button class="tab ${k===day?"on":""}" data-d="${k}">${v}<small>${DATA.filter(r=>enDia(r,k)).length} clientes</small></button>`).join("");
   tabs.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{day=b.dataset.d;focus=null;draw()});
 }
 function draw(){
@@ -177,21 +179,21 @@ function draw(){
     for(const p of pts){bounds.push([p.la,p.lo]);
       const style=p.s==="revisar"?{color:"#d1242f",weight:3}:{color:"#fff",weight:1.5};
       L.circleMarker(pos(p),{radius:focus?8:6,fillColor:v.col,fillOpacity:.9,...style})
-       .bindPopup(`<b>${esc(p.n)}</b><br>${esc(p.d)} · ${esc(p.l)}<br>Cód. ${esc(p.c)} · Vendedor ${v.id} ${esc(v.name)}<br>Horario: ${esc(p.h||"-")}${p.t?"<br>Tel: "+esc(p.t):""}${p.no?`<br><span style="color:${p.s==="revisar"?"#d1242f":"#555"}">${esc(p.no)}</span>`:""}<br><a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${p.la},${p.lo}">Ver en Google Maps</a>`)
+       .bindPopup(`<b>${esc(p.n)}</b><br>${esc(p.d)} · ${esc(p.l)}<br>Cód. ${esc(p.c)} · Vendedor ${v.id} ${esc(v.name)}<br>Visita: ${DN[p.dia]}<br>Horario: ${esc(p.h||"-")}${p.t?"<br>Tel: "+esc(p.t):""}${p.no?`<br><span style="color:${p.s==="revisar"?"#d1242f":"#555"}">${esc(p.no)}</span>`:""}<br><a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${p.la},${p.lo}">Ver en Google Maps</a>`)
        .bindTooltip(`${v.id} · ${esc(p.n)}`).addTo(layer);
     }}
   map.invalidateSize(); if(bounds.length) map.fitBounds(L.latLngBounds(bounds),{padding:[30,30],maxZoom:16,animate:false});
   side(G);
 }
 function side(G){
-  const dn=DAYS.find(x=>x[0]===day)[1], vs=VEND.filter(v=>G[v.id]);
-  const all=DATA.filter(r=>r.dia===day), rel=all.filter(r=>r.s==="reubicado").length, rev=all.filter(r=>r.s==="revisar").length;
+  const dn=TABS.find(x=>x[0]===day)[1], vs=VEND.filter(v=>G[v.id]);
+  const all=DATA.filter(r=>enDia(r,day)), rel=all.filter(r=>r.s==="reubicado").length, rev=all.filter(r=>r.s==="revisar").length;
   let h=`<div class="sum"><div class="kpi"><b>${vs.length}</b><span>vendedores</span></div><div class="kpi"><b>${all.length}</b><span>clientes</span></div><div class="kpi"><b>${rel}</b><span>reubicados</span></div></div>`;
   if(focus){const v=VEND.find(x=>x.id===focus), pts=G[focus].slice().sort((a,b)=>a.l.localeCompare(b.l)||a.d.localeCompare(b.d));
     h+=`<button class="btn" id="bBack">← Todos los vendedores</button><h3>Vendedor ${v.id} · ${esc(v.name)} — ${pts.length} clientes (${dn})</h3><ol class="seq">`+
-      pts.map((p,i)=>`<li data-c="${esc(p.c)}"><span class="n" style="background:${v.col}"></span><span>${esc(p.n)}<br><small>${esc(p.d)} · ${esc(p.l)}${p.h?" · "+esc(p.h):""}</small>${p.s!=="ok"?`<br><small class="${p.s==="revisar"?"warn":""}">${p.s==="revisar"?"⚠ Revisar ubicación":"★ Reubicado"}</small>`:""}</span></li>`).join("")+`</ol>`;
+      pts.map((p,i)=>`<li data-c="${esc(p.c)}"><span class="n" style="background:${v.col}"></span><span>${esc(p.n)}<br><small>${esc(p.d)} · ${esc(p.l)}${p.h?" · "+esc(p.h):""}${day==="T"?" · <b>"+DN[p.dia]+"</b>":""}</small>${p.s!=="ok"?`<br><small class="${p.s==="revisar"?"warn":""}">${p.s==="revisar"?"⚠ Revisar ubicación":"★ Reubicado"}</small>`:""}</span></li>`).join("")+`</ol>`;
   } else {
-    h+=`<h3>Vendedores del ${dn}</h3>`+vs.map(v=>{const p=G[v.id], nr=p.filter(x=>x.s==="revisar").length;
+    h+=`<h3>${day==="T"?"Vendedores · todos los días":"Vendedores del "+dn}</h3>`+vs.map(v=>{const p=G[v.id], nr=p.filter(x=>x.s==="revisar").length;
       return `<div class="vrow" data-v="${v.id}"><input type="checkbox" ${hidden.has(v.id)?"":"checked"} data-c="${v.id}"><span class="sw" style="background:${v.col}"></span><span><b>${v.id}</b> ${esc(v.name)}</span><span class="meta">${p.length} clientes${nr?` · <span class="warn">${nr}⚠</span>`:""}</span></div>`}).join("");
     h+=`<div class="hint">Clic en un vendedor para ver solo sus clientes. Tildá/destildá para mostrar u ocultar.</div>`;
   }
@@ -200,7 +202,7 @@ function side(G){
   s.querySelectorAll("input[data-c]").forEach(c=>{c.onclick=e=>{e.stopPropagation();const id=+c.dataset.c;c.checked?hidden.delete(id):hidden.add(id);draw()}});
   s.querySelectorAll(".vrow").forEach(r=>r.onclick=()=>{focus=+r.dataset.v;draw()});
   const bb=document.getElementById("bBack"); if(bb) bb.onclick=()=>{focus=null;draw()};
-  s.querySelectorAll("ol.seq li").forEach(li=>li.onclick=()=>{const p=DATA.find(r=>r.c===li.dataset.c&&r.dia===day&&r.v===focus);const q=pos(p);map.setView(q,17);
+  s.querySelectorAll("ol.seq li").forEach(li=>li.onclick=()=>{const p=DATA.find(r=>r.c===li.dataset.c&&enDia(r,day)&&r.v===focus);const q=pos(p);map.setView(q,17);
     layer.eachLayer(l=>{if(l.getLatLng&&l.getPopup&&l.getPopup()){const g=l.getLatLng();if(g.lat===q[0]&&g.lng===q[1])l.openPopup()}})});
 }
 document.getElementById("bAll").onclick=()=>{if(hidden.size)hidden.clear();else VEND.forEach(v=>hidden.add(v.id));focus=null;draw()};
@@ -211,7 +213,7 @@ const DN=Object.fromEntries(DAYS);
 let marca=null, pinDir=null;
 function resaltar(lat,lng){ if(marca) map.removeLayer(marca); marca=L.marker([lat,lng],{interactive:false,icon:L.divIcon({className:"",html:'<div class="pulso" style="width:34px;height:34px"></div>',iconSize:[34,34],iconAnchor:[17,17]})}).addTo(map); }
 function irACliente(p){
-  day=p.dia; focus=null; hidden.delete(p.v); draw();
+  if(day!=="T") day=p.dia; focus=null; hidden.delete(p.v); draw();
   const q=pos(p); map.setView(q,17,{animate:false}); resaltar(q[0],q[1]);
   layer.eachLayer(l=>{ if(l.getLatLng&&l.getPopup&&l.getPopup()){ const g=l.getLatLng(); if(g.lat===q[0]&&g.lng===q[1]) l.openPopup(); } });
 }
