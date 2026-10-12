@@ -61,13 +61,13 @@ ol.seq li small{color:var(--muted)}
 .legend{font-size:12px;color:var(--muted);margin-top:8px;display:grid;gap:4px}
 .legend i{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-3px;margin-right:6px;background:#888}
 .hint{font-size:12px;color:var(--muted);margin:6px 0}
-/* panel izquierdo y encabezado en negro con letras blancas en negrita */
-header,aside{--panel:#000;--bg:#161616;--ink:#fff;--muted:#fff;--line:#3a3a3a;background:#000;color:#fff}
+/* panel izquierdo y encabezado en blanco con letras oscuras en negrita (en tema claro y oscuro) */
+header,aside{--panel:#fff;--bg:#f3f4f6;--ink:#111;--muted:#222;--line:#e1e4e8;background:#fff;color:#111;color-scheme:light}
 header,header *,aside,aside *{font-weight:700}
 header h1{font-weight:800}
-aside input::placeholder{color:#b5b5b5}
-aside .vrow:hover{background:#1f1f1f}
-aside .hint,aside .legend,aside small{color:#fff}
+aside input::placeholder{color:#666}
+aside .vrow:hover{background:#f1f3f5}
+aside .hint,aside .legend,aside small{color:#222}
 
 @media (max-width:820px){#app{grid-template-columns:1fr;grid-template-rows:auto 45vh 1fr}aside{order:3;border-right:0}header{grid-column:1}#map{min-height:45vh}}
 .leaflet-container{background:#eceef1;--ps:1}
@@ -184,6 +184,7 @@ function renderTabs(){
   tabs.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{day=b.dataset.d;focus=null;draw()});
 }
 // ---- realce interactivo de un vendedor ----
+let ajustePendiente=false;
 let MK={}, etiqueta=null, realceFijo=null, realceTimer=null;
 function realce(id){
   if(etiqueta){ map.removeLayer(etiqueta); etiqueta=null; }
@@ -216,7 +217,7 @@ function draw(){
        .bindPopup(`<b>${esc(p.n)}</b><br>${esc(p.d)} · ${esc(p.l)}<br>Cód. ${esc(p.c)} · Vendedor ${v.id} ${esc(v.name)}<br>Visita: ${DN[p.dia]}<br>Horario: ${esc(p.h||"-")}${p.t?"<br>Tel: "+esc(p.t):""}${p.no?`<br><span style="color:${p.s==="revisar"?"#d1242f":"#555"}">${esc(p.no)}</span>`:""}<br><a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${p.la},${p.lo}">Ver en Google Maps</a>`)
        .bindTooltip(`${v.id} · ${esc(p.n)}`).addTo(layer);
     }}
-  map.invalidateSize(); if(bounds.length) map.fitBounds(L.latLngBounds(bounds),{padding:[30,30],maxZoom:16,animate:false});
+  map.invalidateSize(); { const sz=map.getSize(); if(bounds.length&&sz.x>80&&sz.y>80) map.fitBounds(L.latLngBounds(bounds),{padding:[30,30],maxZoom:16,animate:false}); else if(bounds.length) ajustePendiente=true; }
   side(G);
 }
 function side(G){
@@ -296,6 +297,8 @@ document.getElementById("q").addEventListener("input",mostrarResultados);
 document.getElementById("q").addEventListener("keydown",e=>{ if(e.key==="Enter"){ const f=document.querySelector("#res li"); if(f) f.click(); } });
 
 draw();
+// reajustar cuando la página termina de cargar (el panel puede tardar en tomar su tamaño)
+new ResizeObserver(()=>{ map.invalidateSize(); if(ajustePendiente){ ajustePendiente=false; draw(); } }).observe(document.getElementById("map"));
 </script>
 </body>
 </html>
