@@ -45,6 +45,9 @@ aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;p
 .vrow.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
 .sw{width:14px;height:14px;border-radius:4px}
 .vrow .meta{color:var(--muted);font-size:12px;text-align:right;white-space:nowrap}
+.vrow.hl{background:color-mix(in srgb,var(--accent) 20%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
+.vlabel{background:#fff;border:2px solid #333;border-radius:6px;font:700 13px/1.2 Roboto,Arial,sans-serif;color:#222;padding:4px 8px;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.vlabel:before{display:none}
 .warn{color:var(--warn)}
 h3{font-size:13px;margin:14px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 ol.seq{margin:0;padding-left:0;list-style:none}
@@ -172,13 +175,36 @@ function renderTabs(){
   tabs.innerHTML=TABS.map(([k,v])=>`<button class="tab ${k===day?"on":""}" data-d="${k}">${v}<small>${DATA.filter(r=>enDia(r,k)).length} clientes</small></button>`).join("");
   tabs.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{day=b.dataset.d;focus=null;draw()});
 }
+// ---- realce interactivo de un vendedor ----
+let MK={}, etiqueta=null, realceFijo=null, realceTimer=null;
+function realce(id){
+  if(etiqueta){ map.removeLayer(etiqueta); etiqueta=null; }
+  for(const k in MK) for(const m of MK[k]){ const o=m._st;
+    if(id==null){ m.setStyle({color:o.color,weight:o.weight,fillOpacity:.9,opacity:1}); m.setRadius(o.radius); }
+    else if(+k===id){ m.setStyle({color:"#111",weight:2,fillOpacity:1,opacity:1}); m.setRadius(o.radius+3); m.bringToFront(); }
+    else { m.setStyle({fillOpacity:.12,opacity:.15}); m.setRadius(o.radius); } }
+  if(id!=null&&MK[id]){ const v=VEND.find(z=>z.id===id), ll=MK[id].map(m=>m.getLatLng());
+    const c=[ll.reduce((s,p)=>s+p.lat,0)/ll.length, ll.reduce((s,p)=>s+p.lng,0)/ll.length];
+    etiqueta=L.tooltip({permanent:true,direction:"center",className:"vlabel",interactive:false}).setLatLng(c)
+      .setContent(`<span style="color:${v.col}">●</span> ${v.id} · ${esc(v.name)} — ${ll.length} clientes`).addTo(map); }
+}
+function marcarFila(id){
+  document.querySelectorAll(".vrow.hl").forEach(r=>r.classList.remove("hl"));
+  if(id==null) return; const r=document.querySelector(`.vrow[data-v="${id}"]`); if(r){ r.classList.add("hl"); r.scrollIntoView({block:"nearest"}); }
+}
+function realceTemporal(id){ clearTimeout(realceTimer); realceFijo=id; realce(id); marcarFila(id);
+  realceTimer=setTimeout(()=>{ realceFijo=null; realce(null); marcarFila(null); },3000); }
 function draw(){
-  renderTabs(); layer.clearLayers();
+  renderTabs(); layer.clearLayers(); MK={};
+  if(etiqueta){ map.removeLayer(etiqueta); etiqueta=null; } clearTimeout(realceTimer); realceFijo=null;
   const G=byVend(day), bounds=[];
   for(const v of VEND){const pts=G[v.id]; if(!pts||hidden.has(v.id)) continue; if(focus&&focus!==v.id) continue;
     for(const p of pts){bounds.push([p.la,p.lo]);
       const style=p.s==="revisar"?{color:"#d1242f",weight:3}:{color:"#fff",weight:1.5};
-      L.circleMarker(pos(p),{radius:focus?8:6,fillColor:v.col,fillOpacity:.9,...style})
+      const m=L.circleMarker(pos(p),{radius:focus?8:6,fillColor:v.col,fillOpacity:.9,...style});
+      m._st={...style,radius:focus?8:6}; (MK[v.id]=MK[v.id]||[]).push(m);
+      m.on("mouseover",()=>{ if(realceFijo==null) marcarFila(v.id); }).on("mouseout",()=>{ if(realceFijo==null) marcarFila(null); });
+      m
        .bindPopup(`<b>${esc(p.n)}</b><br>${esc(p.d)} · ${esc(p.l)}<br>Cód. ${esc(p.c)} · Vendedor ${v.id} ${esc(v.name)}<br>Visita: ${DN[p.dia]}<br>Horario: ${esc(p.h||"-")}${p.t?"<br>Tel: "+esc(p.t):""}${p.no?`<br><span style="color:${p.s==="revisar"?"#d1242f":"#555"}">${esc(p.no)}</span>`:""}<br><a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${p.la},${p.lo}">Ver en Google Maps</a>`)
        .bindTooltip(`${v.id} · ${esc(p.n)}`).addTo(layer);
     }}
@@ -199,8 +225,11 @@ function side(G){
   }
   h+=`<div class="legend"><span><i style="border:2px solid #fff;box-shadow:0 0 0 1px #999"></i>Cliente</span><span><i style="border:3px solid #d1242f"></i>Revisar (dirección no encontrada o dudosa)</span><span>${rev} a revisar este día</span></div>`;
   const s=document.getElementById("side"); s.innerHTML=h;
-  s.querySelectorAll("input[data-c]").forEach(c=>{c.onclick=e=>{e.stopPropagation();const id=+c.dataset.c;c.checked?hidden.delete(id):hidden.add(id);draw()}});
-  s.querySelectorAll(".vrow").forEach(r=>r.onclick=()=>{focus=+r.dataset.v;draw()});
+  s.querySelectorAll("input[data-c]").forEach(c=>{c.onclick=e=>{e.stopPropagation();const id=+c.dataset.c;c.checked?hidden.delete(id):hidden.add(id);draw();if(c.checked) realceTemporal(id)}});
+  s.querySelectorAll(".vrow").forEach(r=>{ const id=+r.dataset.v;
+    r.onclick=()=>{focus=id;draw()};
+    r.onmouseenter=()=>{ if(!hidden.has(id)&&realceFijo==null){ realce(id); r.classList.add("hl"); } };
+    r.onmouseleave=()=>{ if(realceFijo==null){ realce(null); r.classList.remove("hl"); } }; });
   const bb=document.getElementById("bBack"); if(bb) bb.onclick=()=>{focus=null;draw()};
   s.querySelectorAll("ol.seq li").forEach(li=>li.onclick=()=>{const p=DATA.find(r=>r.c===li.dataset.c&&enDia(r,day)&&r.v===focus);const q=pos(p);map.setView(q,17);
     layer.eachLayer(l=>{if(l.getLatLng&&l.getPopup&&l.getPopup()){const g=l.getLatLng();if(g.lat===q[0]&&g.lng===q[1])l.openPopup()}})});
