@@ -24,6 +24,20 @@ header h1{font-size:16px;margin:0 8px 0 0;font-weight:650}
 .btn.arm{background:#fff4d6;border-color:#d4a72c;color:#5c4400}
 aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:12px}
 #map{height:100%;width:100%}
+.buscar{position:sticky;top:0;z-index:5;background:var(--panel);padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+.buscar label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.buscar input{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.buscar input:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+.res{list-style:none;margin:6px 0 0;padding:0;max-height:300px;overflow:auto}
+.res li{display:grid;grid-template-columns:12px 1fr;gap:8px;align-items:start;padding:6px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.res li:hover,.res li:focus{background:color-mix(in srgb,var(--accent) 10%,transparent);outline:none}
+.res li .sw{width:12px;height:12px;border-radius:50%;margin-top:3px}
+.res small{color:var(--muted)}
+.res .dir{color:var(--accent)}
+.res .vacio{display:block;color:var(--muted);cursor:default;padding:6px 4px}
+.pulso{border-radius:50%;border:3px solid #d93025;animation:pulso 1.2s ease-out 4}
+@keyframes pulso{from{transform:scale(.4);opacity:1}to{transform:scale(1.6);opacity:0}}
+@media (prefers-reduced-motion:reduce){.pulso{animation:none}}
 .sum{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
 .kpi{border:1px solid var(--line);border-radius:8px;padding:6px 8px}.kpi b{display:block;font-size:18px}.kpi span{color:var(--muted);font-size:11px}
 .vrow{display:grid;grid-template-columns:18px 14px 1fr auto;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--line);cursor:pointer}
@@ -58,7 +72,7 @@ ol.seq li small{color:var(--muted)}
     <button class="btn" id="bAll">Todos / ninguno</button>
   </div>
 </header>
-<aside id="side"></aside>
+<aside><div class="buscar"><label for="q">Buscar cliente o dirección</label><input id="q" type="search" placeholder="Nombre, código o dirección" autocomplete="off"><ul class="res" id="res"></ul></div><div id="side"></div></aside>
 <div id="map"></div>
 </div>
 <script>
@@ -164,7 +178,6 @@ function draw(){
       L.circleMarker(pos(p),{radius:focus?8:6,fillColor:v.col,fillOpacity:.9,...style})
        .bindPopup(`<b>${esc(p.n)}</b><br>${esc(p.d)} · ${esc(p.l)}<br>Cód. ${esc(p.c)} · Vendedor ${v.id} ${esc(v.name)}<br>Horario: ${esc(p.h||"-")}${p.t?"<br>Tel: "+esc(p.t):""}${p.no?`<br><span style="color:${p.s==="revisar"?"#d1242f":"#555"}">${esc(p.no)}</span>`:""}<br><a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${p.la},${p.lo}">Ver en Google Maps</a>`)
        .bindTooltip(`${v.id} · ${esc(p.n)}`).addTo(layer);
-      if(focus&&p.s==="reubicado"&&p.olo<0&&Math.abs(p.ola-p.olo)>0.5&&(p.ola!==p.la||p.olo!==p.lo)){L.polyline([[p.ola,p.olo],[p.la,p.lo]],{color:"#555",weight:1.5,dashArray:"4 4"}).addTo(layer);L.circleMarker([p.ola,p.olo],{radius:4,color:"#555",fill:false}).bindTooltip("Ubicación original").addTo(layer)}
     }}
   map.invalidateSize(); if(bounds.length) map.fitBounds(L.latLngBounds(bounds),{padding:[30,30],maxZoom:16,animate:false});
   side(G);
@@ -190,6 +203,44 @@ function side(G){
     layer.eachLayer(l=>{if(l.getLatLng&&l.getPopup&&l.getPopup()){const g=l.getLatLng();if(g.lat===q[0]&&g.lng===q[1])l.openPopup()}})});
 }
 document.getElementById("bAll").onclick=()=>{if(hidden.size)hidden.clear();else VEND.forEach(v=>hidden.add(v.id));focus=null;draw()};
+// ---- Buscar por cliente (nombre o código) y por dirección ----
+const norm=s=>String(s??"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+const IDX=DATA.map(r=>({r,k:norm(r.n+" "+r.c+" "+r.d+" "+r.l)}));
+const DN=Object.fromEntries(DAYS);
+let marca=null, pinDir=null;
+function resaltar(lat,lng){ if(marca) map.removeLayer(marca); marca=L.marker([lat,lng],{interactive:false,icon:L.divIcon({className:"",html:'<div class="pulso" style="width:34px;height:34px"></div>',iconSize:[34,34],iconAnchor:[17,17]})}).addTo(map); }
+function irACliente(p){
+  day=p.dia; focus=null; hidden.delete(p.v); draw();
+  const q=pos(p); map.setView(q,17,{animate:false}); resaltar(q[0],q[1]);
+  layer.eachLayer(l=>{ if(l.getLatLng&&l.getPopup&&l.getPopup()){ const g=l.getLatLng(); if(g.lat===q[0]&&g.lng===q[1]) l.openPopup(); } });
+}
+async function buscarDireccion(txt){
+  const ul=document.getElementById("res"); const li=ul.querySelector(".dir-li"); if(li) li.innerHTML='<span></span><span><small>Buscando la dirección…</small></span>';
+  try{
+    const u="https://photon.komoot.io/api/?limit=1&lang=es&bbox=-58.95,-35.25,-57.95,-34.45&q="+encodeURIComponent(txt+", Buenos Aires");
+    const j=await (await fetch(u)).json(); const f=j.features&&j.features[0];
+    if(!f){ if(li) li.innerHTML='<span></span><span><small>No se encontró esa dirección en el mapa.</small></span>'; return; }
+    const [lo,la]=f.geometry.coordinates, p=f.properties, nom=[p.street||p.name,p.housenumber].filter(Boolean).join(" ")+", "+(p.city||p.district||p.county||"");
+    if(pinDir) map.removeLayer(pinDir);
+    pinDir=L.marker([la,lo]).bindPopup("<b>"+esc(nom)+"</b><br><small>Dirección buscada</small>").addTo(map).openPopup();
+    map.setView([la,lo],17,{animate:false}); resaltar(la,lo);
+    if(li) li.innerHTML='<span></span><span class="dir">📍 '+esc(nom)+'</span>';
+  }catch(e){ if(li) li.innerHTML='<span></span><span><small>No se pudo buscar la dirección (revisá la conexión a internet).</small></span>'; }
+}
+function mostrarResultados(){
+  const txt=document.getElementById("q").value, t=norm(txt), ul=document.getElementById("res");
+  if(t.length<2){ ul.innerHTML=""; return; }
+  const ws=t.split(" "); const hits=IDX.filter(x=>ws.every(w=>x.k.includes(w))).slice(0,40);
+  let h=hits.map((x,i)=>{const p=x.r,v=VEND.find(z=>z.id===p.v);return `<li tabindex="0" data-i="${DATA.indexOf(p)}"><span class="sw" style="background:${v.col}"></span><span><b>${esc(p.n)}</b> <small>· cód. ${esc(p.c)}</small><br><small>${esc(p.d)} · ${esc(p.l)}<br>${DN[p.dia]} · vendedor ${v.id} ${esc(v.name)}</small></span></li>`}).join("");
+  if(!hits.length) h='<span class="vacio">Ningún cliente coincide.</span>';
+  if(/\d/.test(txt)||!hits.length) h+=`<li tabindex="0" class="dir-li"><span></span><span class="dir">📍 Buscar «${esc(txt)}» como dirección en el mapa</span></li>`;
+  ul.innerHTML=h;
+  ul.querySelectorAll("li").forEach(li=>{ const go=()=>{ if(li.classList.contains("dir-li")) buscarDireccion(txt); else irACliente(DATA[+li.dataset.i]); };
+    li.onclick=go; li.onkeydown=e=>{ if(e.key==="Enter") go(); }; });
+}
+document.getElementById("q").addEventListener("input",mostrarResultados);
+document.getElementById("q").addEventListener("keydown",e=>{ if(e.key==="Enter"){ const f=document.querySelector("#res li"); if(f) f.click(); } });
+
 draw();
 </script>
 
