@@ -1,0 +1,12 @@
+name: Explorar base de Gescom (solo estructura)
+on: workflow_dispatch
+jobs:
+  explorar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Leer estructura
+        shell: powershell
+        env:
+          GESCOM_LPE_CLAVE: ${{ secrets.GESCOM_LPE_CLAVE }}
+        run: .\robot\explorar.ps1
