@@ -220,14 +220,19 @@ async function buscarDireccion(txt){
   try{
     let la,lo,nom;
     // 1) OpenStreetMap (Photon), limitado al conurbano sur
-    const j=await (await fetch("https://photon.komoot.io/api/?limit=1&bbox=-58.95,-35.25,-57.95,-34.45&q="+encodeURIComponent(txt))).json();
-    const f=j.features&&j.features[0];
+    const j=await (await fetch("https://photon.komoot.io/api/?limit=5&bbox=-58.95,-35.25,-57.95,-34.45&q="+encodeURIComponent(txt))).json();
+    // la calle encontrada tiene que contener la palabra principal buscada (evita "calle 14" -> "calle 154")
+    const tk=norm(txt.split(",")[0]).split(" "); let hn=-1; tk.forEach((w,i)=>{ if(/^\d+$/.test(w)&&i>0) hn=i; });
+    const calle=(hn>0?tk.slice(0,hn):tk).join(" ").replace(/^(calle|avenida|av|avda)\s+/,"");
+    const clave=/^\d+[a-z]?$/.test(calle)?calle:(calle.split(" ").filter(w=>w.length>=2&&!["de","del","la","las","los","el","y"].includes(w)).sort((a,b)=>b.length-a.length)[0]||"");
+    const coincide=s=>!clave||(" "+norm(s)+" ").includes(" "+clave+" ");
+    const f=(j.features||[]).find(x=>coincide(x.properties.street||x.properties.name));
     if(f){ [lo,la]=f.geometry.coordinates; const p=f.properties; nom=[p.street||p.name,p.housenumber].filter(Boolean).join(" ")+", "+(p.city||p.district||p.county||""); }
     else {
       // 2) Registro oficial de calles (Georef); "calle altura, localidad"
       const [dir,...resto]=txt.split(","), loc=resto.join(",").trim();
       const g=await (await fetch("https://apis.datos.gob.ar/georef/api/direcciones?max=1&provincia=Buenos%20Aires&direccion="+encodeURIComponent(dir.trim())+(loc?"&departamento="+encodeURIComponent(loc):""))).json();
-      const d=g.direcciones&&g.direcciones.find(x=>x.ubicacion&&x.ubicacion.lat!=null);
+      const d=g.direcciones&&g.direcciones.find(x=>x.ubicacion&&x.ubicacion.lat!=null&&coincide(x.calle&&x.calle.nombre||x.nomenclatura));
       if(d){ la=d.ubicacion.lat; lo=d.ubicacion.lon; nom=d.nomenclatura; }
     }
     if(la==null){ if(li) li.innerHTML='<span></span><span><small>No se encontró esa dirección. Probá con calle y altura, por ejemplo «Mitre 1729 Avellaneda».</small></span>'; return; }
