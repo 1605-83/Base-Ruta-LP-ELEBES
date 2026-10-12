@@ -1,0 +1,36 @@
+name: Actualizar mapa desde Gescom
+
+on:
+  schedule:
+    - cron: '30 16 * * *'   # todos los dias a las 13:30 hora argentina (16:30 UTC)
+  workflow_dispatch:         # boton "Run workflow" para correrlo a mano
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualizar
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Leer clientes de Gescom y armar el mapa
+        env:
+          GESCOM_LPE_CLAVE: ${{ secrets.GESCOM_LPE_CLAVE }}
+        run: perl robot/actualizar.pl
+
+      - name: Subir el mapa nuevo
+        run: |
+          git config user.name "robot-gescom"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html robot/estado.json robot/cache.tsv
+          if git diff --cached --quiet; then
+            echo "Sin cambios: no se sube nada"
+          else
+            git commit -m "Mapa actualizado desde Gescom ($(TZ=ART3 date '+%d/%m/%Y %H:%M')): $(cat robot/.resumen)"
+            git push
+          fi
