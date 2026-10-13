@@ -18,6 +18,7 @@ header h1{font-size:16px;margin:0 8px 0 0;font-weight:650}
 .tabs{display:flex;gap:4px;flex-wrap:wrap}
 .tab{border:1px solid var(--line);background:transparent;color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer;font:inherit;text-align:left}
 .tab small{display:block;color:var(--muted);font-size:11px}
+.btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .tab.on{background:var(--accent);border-color:var(--accent);color:#fff}.tab.on small{color:#dbe7ff}
 .tools{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
 .btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 10px;border-radius:8px;cursor:pointer;font:inherit}
@@ -81,6 +82,7 @@ aside .hint,aside .legend,aside small{color:#222}
   <h1>Base ruta LP - ELEBES OCTUBRE 2026</h1>
   <div class="tabs" id="tabs"></div>
   <div class="tools">
+    <button class="btn" id="bComb" aria-pressed="false" title="Activalo y tocá varios días para verlos juntos">Combinar días</button>
     <button class="btn" id="bAll">Todos / ninguno</button>
   </div>
 </header>
@@ -168,7 +170,11 @@ const DATA = /*DATA*/;
 const VEND = /*VEND*/;
 const DAYS=[["Lu","Lunes"],["Ma","Martes"],["Mi","Miércoles"],["Ju","Jueves"],["Vi","Viernes"]];
 const TABS=[...DAYS,["T","Todos"]];
-const enDia=(r,d)=>d==="T"||r.dia===d;
+const enDia=(r,d)=>d==="T"||d.split("+").includes(r.dia);
+// días combinados: "Lu+Ju" -> "Lunes y Jueves"
+const diaNombre=d=>d==="T"?"Todos":d.split("+").map(k=>DAYS.find(x=>x[0]===k)[1]).join(" y ").replace(/ y (?=.* y )/g,", ");
+const multiDia=d=>d==="T"||d.includes("+");
+let combinar=false;
 let day="Lu", hidden=new Set(), focus=null;
 const map=L.map("map").setView([-34.76,-58.33],11);
 addBasemap(map);
@@ -180,8 +186,12 @@ function pos(p){return SPREAD[p.c]||[p.la,p.lo]}
 function byVend(d){const o={};for(const r of DATA){if(!enDia(r,d))continue;(o[r.v]=o[r.v]||[]).push(r)}return o}
 function renderTabs(){
   const tabs=document.getElementById("tabs");
-  tabs.innerHTML=TABS.map(([k,v])=>`<button class="tab ${k===day?"on":""}" data-d="${k}">${v}<small>${DATA.filter(r=>enDia(r,k)).length} clientes</small></button>`).join("");
-  tabs.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{day=b.dataset.d;focus=null;draw()});
+  tabs.innerHTML=TABS.map(([k,v])=>`<button class="tab ${(k===day||(k!=="T"&&day!=="T"&&day.split("+").includes(k)))?"on":""}" data-d="${k}">${v}<small>${DATA.filter(r=>enDia(r,k)).length} clientes</small></button>`).join("");
+  tabs.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{ const k=b.dataset.d;
+    if(!combinar||k==="T"||day==="T") day=k;
+    else { const s=new Set(day.split("+")); if(s.has(k)){ if(s.size>1) s.delete(k); } else s.add(k); day=DAYS.map(x=>x[0]).filter(z=>s.has(z)).join("+"); }
+    focus=null; draw(); });
+  const bc=document.getElementById("bComb"); bc.classList.toggle("on",combinar); bc.setAttribute("aria-pressed",combinar);
 }
 // ---- realce interactivo de un vendedor ----
 let ajustePendiente=false;
@@ -221,14 +231,14 @@ function draw(){
   side(G);
 }
 function side(G){
-  const dn=TABS.find(x=>x[0]===day)[1], vs=VEND.filter(v=>G[v.id]);
+  const dn=diaNombre(day), vs=VEND.filter(v=>G[v.id]);
   const all=DATA.filter(r=>enDia(r,day)), rel=all.filter(r=>r.s==="reubicado").length, rev=all.filter(r=>r.s==="revisar").length;
   let h=`<div class="sum"><div class="kpi"><b>${vs.length}</b><span>vendedores</span></div><div class="kpi"><b>${all.length}</b><span>clientes</span></div><div class="kpi"><b>${rel}</b><span>reubicados</span></div></div>`;
   if(focus){const v=VEND.find(x=>x.id===focus), pts=G[focus].slice().sort((a,b)=>a.l.localeCompare(b.l)||a.d.localeCompare(b.d));
     h+=`<button class="btn" id="bBack">← Todos los vendedores</button><h3>Vendedor ${v.id} · ${esc(v.name)} — ${pts.length} clientes (${dn})</h3><ol class="seq">`+
-      pts.map((p,i)=>`<li data-c="${esc(p.c)}"><span class="n" style="background:${v.col}"></span><span>${esc(p.n)}<br><small>${esc(p.d)} · ${esc(p.l)}${p.h?" · "+esc(p.h):""}${day==="T"?" · <b>"+DN[p.dia]+"</b>":""}</small>${p.s!=="ok"?`<br><small class="${p.s==="revisar"?"warn":""}">${p.s==="revisar"?"⚠ Revisar ubicación":"★ Reubicado"}</small>`:""}</span></li>`).join("")+`</ol>`;
+      pts.map((p,i)=>`<li data-c="${esc(p.c)}"><span class="n" style="background:${v.col}"></span><span>${esc(p.n)}<br><small>${esc(p.d)} · ${esc(p.l)}${p.h?" · "+esc(p.h):""}${multiDia(day)?" · <b>"+DN[p.dia]+"</b>":""}</small>${p.s!=="ok"?`<br><small class="${p.s==="revisar"?"warn":""}">${p.s==="revisar"?"⚠ Revisar ubicación":"★ Reubicado"}</small>`:""}</span></li>`).join("")+`</ol>`;
   } else {
-    h+=`<h3>${day==="T"?"Vendedores · todos los días":"Vendedores del "+dn}</h3>`+vs.map(v=>{const p=G[v.id], nr=p.filter(x=>x.s==="revisar").length;
+    h+=`<h3>${day==="T"?"Vendedores · todos los días":day.includes("+")?"Vendedores · "+dn:"Vendedores del "+dn}</h3>`+vs.map(v=>{const p=G[v.id], nr=p.filter(x=>x.s==="revisar").length;
       return `<div class="vrow" data-v="${v.id}"><input type="checkbox" ${hidden.has(v.id)?"":"checked"} data-c="${v.id}"><span class="sw" style="background:${v.col}"></span><span><b>${v.id}</b> ${esc(v.name)}</span><span class="meta">${p.length} clientes${nr?` · <span class="warn">${nr}⚠</span>`:""}</span></div>`}).join("");
     h+=`<div class="hint">Clic en un vendedor para ver solo sus clientes. Tildá/destildá para mostrar u ocultar.</div>`;
   }
@@ -243,6 +253,7 @@ function side(G){
   s.querySelectorAll("ol.seq li").forEach(li=>li.onclick=()=>{const p=DATA.find(r=>r.c===li.dataset.c&&enDia(r,day)&&r.v===focus);const q=pos(p);map.setView(q,17);
     layer.eachLayer(l=>{if(l.getLatLng&&l.getPopup&&l.getPopup()){const g=l.getLatLng();if(g.lat===q[0]&&g.lng===q[1])l.openPopup()}})});
 }
+document.getElementById("bComb").onclick=()=>{ combinar=!combinar; if(!combinar&&day.includes("+")) day=day.split("+")[0]; draw(); };
 document.getElementById("bAll").onclick=()=>{if(hidden.size)hidden.clear();else VEND.forEach(v=>hidden.add(v.id));focus=null;draw()};
 // ---- Buscar por cliente (nombre o código) y por dirección ----
 const norm=s=>String(s??"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
@@ -251,7 +262,7 @@ const DN=Object.fromEntries(DAYS);
 let marca=null, pinDir=null;
 function resaltar(lat,lng){ if(marca) map.removeLayer(marca); marca=L.marker([lat,lng],{interactive:false,icon:L.divIcon({className:"",html:'<div class="pulso" style="width:34px;height:34px"></div>',iconSize:[34,34],iconAnchor:[17,17]})}).addTo(map); }
 function irACliente(p){
-  if(day!=="T") day=p.dia; focus=null; hidden.delete(p.v); draw();
+  if(!enDia(p,day)) day=p.dia; focus=null; hidden.delete(p.v); draw();
   const q=pos(p); map.setView(q,17,{animate:false}); resaltar(q[0],q[1]);
   layer.eachLayer(l=>{ if(l.getLatLng&&l.getPopup&&l.getPopup()){ const g=l.getLatLng(); if(g.lat===q[0]&&g.lng===q[1]) l.openPopup(); } });
 }
