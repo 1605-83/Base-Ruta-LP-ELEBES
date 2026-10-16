@@ -10,6 +10,34 @@ my $DIR = $FindBin::Bin; my $RAIZ = "$DIR/..";
 require "$DIR/common.pl";
 
 my @VENDEDORES = (2,4,5,6,7,24,26,27,28,29,30,51,52,53,54,56,61,62,63,64,73,74,75,76);
+# Colores: cada vendedor tiene un color distinto para cada día (Lu a Vi), y en un mismo día
+# no se repite ningún color; los vendedores con zonas vecinas ese día tienen colores bien contrastantes.
+my %COLOR_DIA = (
+  2 => { Lu => '#aaffc3', Ma => '#e6194b', Mi => '#dcbeff', Ju => '#0b5d1e', Vi => '#ffe119' },
+  4 => { Lu => '#f032e6', Ma => '#911eb4', Mi => '#808000', Ju => '#bfef45', Vi => '#3cb44b' },
+  5 => { Lu => '#bfef45', Ma => '#3cb44b', Mi => '#911eb4', Ju => '#4363d8', Vi => '#000075' },
+  6 => { Lu => '#fabed4', Ma => '#7b4173', Mi => '#3cb44b', Ju => '#ff7f7f', Vi => '#f58231' },
+  7 => { Lu => '#ff7f7f', Ma => '#9a6324', Mi => '#4363d8', Ju => '#469990', Vi => '#7b4173' },
+  24 => { Lu => '#00a0ff', Ma => '#000000', Mi => '#bfef45', Ju => '#e6194b', Vi => '#ff7f7f' },
+  26 => { Lu => '#e6194b', Ma => '#ffe119', Mi => '#000000', Ju => '#3cb44b', Vi => '#00a0ff' },
+  27 => { Lu => '#ffe119', Ma => '#42d4f4', Mi => '#f032e6', Ju => '#000075', Vi => '#bfef45' },
+  28 => { Lu => '#000075', Ma => '#f032e6', Mi => '#ffe119', Ju => '#00a0ff', Vi => '#000000' },
+  29 => { Lu => '#42d4f4', Ma => '#bfef45', Mi => '#00a0ff', Ju => '#ffe119', Vi => '#f032e6' },
+  30 => { Lu => '#3cb44b', Ma => '#4363d8', Mi => '#f58231', Ju => '#808000', Vi => '#469990' },
+  51 => { Lu => '#0b5d1e', Ma => '#808000', Mi => '#7b4173', Ju => '#ffd8b1', Vi => '#808080' },
+  52 => { Lu => '#000000', Ma => '#fabed4', Mi => '#808080', Ju => '#9a6324', Vi => '#ffd8b1' },
+  53 => { Lu => '#911eb4', Ma => '#000075', Mi => '#ff7f7f', Ju => '#f032e6', Vi => '#0b5d1e' },
+  54 => { Lu => '#808000', Ma => '#aaffc3', Mi => '#0b5d1e', Ju => '#f58231', Vi => '#911eb4' },
+  56 => { Lu => '#7b4173', Ma => '#dcbeff', Mi => '#800000', Ju => '#808080', Vi => '#4363d8' },
+  61 => { Lu => '#f58231', Ma => '#469990', Mi => '#ffd8b1', Ju => '#fabed4', Vi => '#dcbeff' },
+  62 => { Lu => '#4363d8', Ma => '#800000', Mi => '#aaffc3', Ju => '#42d4f4', Vi => '#9a6324' },
+  63 => { Lu => '#469990', Ma => '#0b5d1e', Mi => '#000075', Ju => '#800000', Vi => '#aaffc3' },
+  64 => { Lu => '#9a6324', Ma => '#808080', Mi => '#fabed4', Ju => '#7b4173', Vi => '#800000' },
+  73 => { Lu => '#dcbeff', Ma => '#00a0ff', Mi => '#9a6324', Ju => '#911eb4', Vi => '#e6194b' },
+  74 => { Lu => '#800000', Ma => '#f58231', Mi => '#42d4f4', Ju => '#aaffc3', Vi => '#808000' },
+  75 => { Lu => '#808080', Ma => '#ffd8b1', Mi => '#469990', Ju => '#dcbeff', Vi => '#fabed4' },
+  76 => { Lu => '#ffd8b1', Ma => '#ff7f7f', Mi => '#e6194b', Ju => '#000000', Vi => '#42d4f4' },
+);
 my @COLORES = split / /, '#0b84a5 #3cb44b #4363d8 #f58231 #911eb4 #46a5a8 #f032e6 #7a9c00 #d4a017 #008080 #9a6324 #6a3d9a #2f4f4f #000075 #c71585 #17becf #1e90ff #228b22 #8b008b #b8860b #bcbd22 #4b0082 #556b2f #e377c2';
 my %DIA = (L => 'Lu', M => 'Ma', X => 'Mi', J => 'Ju', V => 'Vi');
 my $BASE = 'https://datos-gescom.panelempresas.workers.dev';
@@ -127,7 +155,7 @@ printf "Duplicados omitidos: %d · clientes en el mapa: %d\n", $dup // 0, scalar
 # ---------- 5. estado nuevo e index.html ----------
 my %nuevo = map { $_->{c} => { la => 0 + sprintf('%.6f', $_->{la}), lo => 0 + sprintf('%.6f', $_->{lo}), s => $_->{s}, no => $_->{no} // '', h => $_->{h}, fp => $_->{fp} } } values %rec;
 { open my $f, '>:raw', "$DIR/estado.json" or die; print $f $J->encode(\%nuevo) }
-my @vend = map { +{ id => $VENDEDORES[$_], name => ($vnom{ $VENDEDORES[$_] } // "Vendedor $VENDEDORES[$_]"), col => $COLORES[$_ % @COLORES] } } 0 .. $#VENDEDORES;
+my @vend = map { +{ id => $VENDEDORES[$_], name => ($vnom{ $VENDEDORES[$_] } // "Vendedor $VENDEDORES[$_]"), col => ($COLOR_DIA{ $VENDEDORES[$_] } ? $COLOR_DIA{ $VENDEDORES[$_] }{Lu} : $COLORES[$_ % @COLORES]), ($COLOR_DIA{ $VENDEDORES[$_] } ? (cd => $COLOR_DIA{ $VENDEDORES[$_] }) : ()) } } 0 .. $#VENDEDORES;
 my %hay = map { $_->{v} => 1 } @fin; @vend = grep { $hay{ $_->{id} } } @vend;
 my @data = map { +{ c => $_->{c}, n => $_->{n}, d => $_->{d}, l => $_->{l}, t => $_->{t}, h => $_->{h}, v => $_->{v}, vn => '', dia => $_->{dia}, ru => $_->{ru},
                     la => 0 + sprintf('%.6f', $_->{la}), lo => 0 + sprintf('%.6f', $_->{lo}), s => $_->{s}, no => $_->{no} // '' } } sort { $a->{c} cmp $b->{c} } @fin;
