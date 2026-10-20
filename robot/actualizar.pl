@@ -166,4 +166,9 @@ $html =~ s{/\*DATA\*/}{$djs}; $html =~ s{/\*VEND\*/}{$JC->encode(\@vend)}e; $htm
 { open my $f, '>:utf8', "$RAIZ/index.html" or die; print $f $html }
 # resumen para el mensaje del commit
 { open my $f, '>:utf8', "$DIR/.resumen" or die; printf $f "altas %d, bajas %d, cambios %d", map { $cnt{$_} // 0 } qw(alta baja cambio) }
+# ubicaciones revisadas por codigo de cliente, para otros tableros (Rutas de vendedores las usa cuando la de Axum
+# cae fuera de la zona del vendedor): {"actualizado":..., "p":{"codigo":[lat,lon,estado]}}
+{ my %p = map { $_->{c} => [ $_->{la}, $_->{lo}, $_->{s} ] } @data;
+  my @t = gmtime(time - 3 * 3600); my $act = sprintf('%04d-%02d-%02d %02d:%02d', $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1]);
+  open my $f, '>:raw', "$RAIZ/posiciones.json" or die; print $f JSON::PP->new->utf8->canonical->encode({ actualizado => $act, p => \%p }) }
 print "Listo: index.html con " . scalar(@data) . " clientes\n";
