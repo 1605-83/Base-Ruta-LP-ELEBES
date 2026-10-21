@@ -67,10 +67,16 @@ sub core { my $s = noacc(shift // ''); $s =~ s/^(CALLE|AVENIDA|AV|DIAGONAL|DTO|T
   my @t = sort { length($b) <=> length($a) } grep { length >= 2 && !/^(DE|DEL|LA|LAS|LOS|EL|Y)$/ } split / /, $s; $t[0] // '' }
 
 # ---------- 1. clientes activos de Gescom ----------
+# la copia de Gescom (datos-gescom) solo actualiza los clientes que cambian: estos siguen como activos en la copia pero en
+# Gescom ya no estan en la cartera (exportacion de clientes de Bruno, 21/10/2026), y 3767 esta activo en Gescom y no en la copia
+my %NO_ACTIVOS = map { $_ => 1 } qw(101466 103062 106218 106559 108768 197 3186 3229 326 329372 3557 4153 5799 711
+  104111 106161 106162 106273 107503 107885 3039 388);
+my @SI_ACTIVOS = qw(3767);
 my %vnom = map { ($_->{codigo} + 0) => $_->{nombre} } grep { $_->{codigo} =~ /^\d+$/ } @{ sql('SELECT codigo, nombre FROM vendedores') };
 my $filas = sql(q{SELECT codigo, razon_social, nombre, direccion, localidad, telefono, latitud, longitud,
   json_extract(rutas,'$[0].vendedor') AS ven, json_extract(rutas,'$[0].dias') AS dias, json_extract(rutas,'$[0].ruta') AS ruta
-  FROM clientes WHERE activo = 1});
+  FROM clientes WHERE activo = 1 OR codigo IN (} . join(',', map { "'$_'" } @SI_ACTIVOS) . q{)});
+$filas = [ grep { !((($_->{codigo} // '') =~ /^\s*(\d+)\s*$/) && $NO_ACTIVOS{ $1 + 0 }) } @$filas ];
 my %quiero = map { $_ => 1 } @VENDEDORES;
 my @cli = grep { defined $_->{ven} && $_->{ven} =~ /^\d+$/ && $quiero{ $_->{ven} + 0 } && $DIA{ $_->{dias} // '' } } @$filas;
 printf "Gescom: %d clientes activos, %d de los %d vendedores con día de visita\n", scalar(@$filas), scalar(@cli), scalar(@VENDEDORES);
