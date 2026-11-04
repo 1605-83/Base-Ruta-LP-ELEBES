@@ -38,11 +38,6 @@ my %COLOR_DIA = (
   75 => { Lu => '#808080', Ma => '#ffd8b1', Mi => '#469990', Ju => '#dcbeff', Vi => '#fabed4' },
   76 => { Lu => '#ffd8b1', Ma => '#ff7f7f', Mi => '#e6194b', Ju => '#000000', Vi => '#42d4f4' },
 );
-# Pedido de Bruno (04/11/2026): cada vendedor tiene UN color fijo para todos los días (el que tenía el lunes; no se repite)
-my %COLOR_FIJO = map { $_ => $COLOR_DIA{$_}{Lu} } keys %COLOR_DIA;
-# con el fondo nocturno los colores oscuros no se ven: esos vendedores pasan a un color claro que no usa nadie
-%COLOR_FIJO = (%COLOR_FIJO, 28 => '#ffffff', 51 => '#2ee8b6', 52 => '#c084fc', 53 => '#f72585', 54 => '#a0c4ff', 56 => '#ffab40',
-  62 => '#e9ff70', 63 => '#d4a373', 64 => '#90be6d', 74 => '#ff99c8', 75 => '#e76f51');
 # Cambios de día pedidos por Bruno que todavía no están en Gescom: código de cliente => día (Lu Ma Mi Ju Vi).
 # Mandan sobre el día de Gescom: sacarlos de acá cuando Gescom ya los tenga.
 my %CAMBIO_DIA = map { $_ => 'Mi' } qw(3091 4228 3703 4826 4749 4688 3609 24060 22525 4008 841);   # vendedor 53, de jueves a miércoles (04/11/2026)
@@ -170,7 +165,7 @@ printf "Duplicados omitidos: %d · clientes en el mapa: %d\n", $dup // 0, scalar
 # ---------- 5. estado nuevo e index.html ----------
 my %nuevo = map { $_->{c} => { la => 0 + sprintf('%.6f', $_->{la}), lo => 0 + sprintf('%.6f', $_->{lo}), s => $_->{s}, no => $_->{no} // '', h => $_->{h}, fp => $_->{fp} } } values %rec;
 { open my $f, '>:raw', "$DIR/estado.json" or die; print $f $J->encode(\%nuevo) }
-my @vend = map { +{ id => $VENDEDORES[$_], name => ($vnom{ $VENDEDORES[$_] } // "Vendedor $VENDEDORES[$_]"), col => ($COLOR_FIJO{ $VENDEDORES[$_] } // $COLORES[$_ % @COLORES]) } } 0 .. $#VENDEDORES;
+my @vend = map { +{ id => $VENDEDORES[$_], name => ($vnom{ $VENDEDORES[$_] } // "Vendedor $VENDEDORES[$_]"), col => ($COLOR_DIA{ $VENDEDORES[$_] } ? $COLOR_DIA{ $VENDEDORES[$_] }{Lu} : $COLORES[$_ % @COLORES]), ($COLOR_DIA{ $VENDEDORES[$_] } ? (cd => $COLOR_DIA{ $VENDEDORES[$_] }) : ()) } } 0 .. $#VENDEDORES;
 my %hay = map { $_->{v} => 1 } @fin; @vend = grep { $hay{ $_->{id} } } @vend;
 my @data = map { +{ c => $_->{c}, n => $_->{n}, d => $_->{d}, l => $_->{l}, t => $_->{t}, h => $_->{h}, v => $_->{v}, vn => '', dia => $_->{dia}, ru => $_->{ru},
                     la => 0 + sprintf('%.6f', $_->{la}), lo => 0 + sprintf('%.6f', $_->{lo}), s => $_->{s}, no => $_->{no} // '' } } sort { $a->{c} cmp $b->{c} } @fin;

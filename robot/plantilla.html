@@ -71,9 +71,9 @@ aside .vrow:hover{background:#f1f3f5}
 aside .hint,aside .legend,aside small{color:#222}
 
 @media (max-width:820px){#app{grid-template-columns:1fr;grid-template-rows:auto 45vh 1fr}aside{order:3;border-right:0}header{grid-column:1}#map{min-height:45vh}}
-.leaflet-container{background:#1d2533;--ps:1}
-.place span{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;font:500 calc(var(--ps)*10px)/1 Roboto,Arial,"Segoe UI",sans-serif;color:#9aa3b0;text-shadow:0 0 2px #1d2533,0 0 2px #1d2533,0 0 1px #1d2533;letter-spacing:.02em}
-.place.rk0 span{font-size:calc(var(--ps)*12px);font-weight:600;color:#c3cad4}.place.rk1 span{font-size:calc(var(--ps)*11px);color:#aab2bd}.place.rk3 span{font-size:calc(var(--ps)*9.5px);color:#8f98a5}
+.leaflet-container{background:#eceef1;--ps:1}
+.place span{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;font:500 calc(var(--ps)*10px)/1 Roboto,Arial,"Segoe UI",sans-serif;color:#8a8f96;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 1px #fff;letter-spacing:.02em}
+.place.rk0 span{font-size:calc(var(--ps)*12px);font-weight:600;color:#7a7f86}.place.rk1 span{font-size:calc(var(--ps)*11px);color:#868b92}.place.rk3 span{font-size:calc(var(--ps)*9.5px);color:#9aa0a6}
 </style>
 </head>
 <body>
@@ -90,11 +90,11 @@ aside .hint,aside .legend,aside small{color:#222}
 <div id="map"></div>
 </div>
 <script>
-// Fondo de mapa nocturno (pedido de Bruno, 04/11/2026), dibujado en la página con datos © OpenStreetMap (ODbL).
+// Fondo de mapa estilo Google, dibujado en la página con datos © OpenStreetMap (ODbL).
 const BASE = /*BASE*/;
-const MAPC = { land: "#1d2533", water: "#0e1a2b", park: "#1f3a2e", street: "#3a4352", streetEdge: "#141a24",
-  arterial: "#4a5466", arterialEdge: "#141a24", avenue: "#6b5d3f", avenueEdge: "#2a2418", highway: "#8a6d3b", highwayEdge: "#2a2010",
-  rail: "#5b6472", river: "#0e1a2b", text: "#aeb6c2", textStrong: "#d6dbe3", halo: "#1d2533" };
+const MAPC = { land: "#eceef1", water: "#aadaff", park: "#c6e8c1", street: "#ffffff", streetEdge: "#d3d6db",
+  arterial: "#ffffff", arterialEdge: "#c2c6cc", avenue: "#fde293", avenueEdge: "#f2c94c", highway: "#f8c967", highwayEdge: "#e0a83c",
+  rail: "#b3b8bf", river: "#aadaff", text: "#5f6368", textStrong: "#3c4043", halo: "#ffffff" };
 const BM = (() => {
   const CELL = 0.02;
   const dec = s => { const a = s.split(",").map(Number), p = new Float64Array(a.length); let la = 0, lo = 0;
@@ -169,7 +169,7 @@ function addBasemap(map) {
 const DATA = /*DATA*/;
 const VEND = /*VEND*/;
 const DAYS=[["Lu","Lunes"],["Ma","Martes"],["Mi","Miércoles"],["Ju","Jueves"],["Vi","Viernes"]];
-// cada vendedor tiene un color fijo (v.col); v.cd queda por si algún día se vuelve a un color por día
+// cada vendedor tiene un color distinto para cada día de visita
 const colV=(v,d)=>(v.cd&&v.cd[d])||v.col;
 const swV=(v,d)=>{const ds=d==="T"?DAYS.map(x=>x[0]):d.split("+"); if(ds.length===1) return colV(v,ds[0]); const s=100/ds.length; return "linear-gradient(90deg,"+ds.map((k,i)=>colV(v,k)+" "+(i*s)+"% "+((i+1)*s)+"%").join(",")+")";};
 const TABS=[...DAYS,["T","Todos"]];
