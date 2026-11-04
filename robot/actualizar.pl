@@ -38,6 +38,11 @@ my %COLOR_DIA = (
   75 => { Lu => '#808080', Ma => '#ffd8b1', Mi => '#469990', Ju => '#dcbeff', Vi => '#fabed4' },
   76 => { Lu => '#ffd8b1', Ma => '#ff7f7f', Mi => '#e6194b', Ju => '#000000', Vi => '#42d4f4' },
 );
+# Pedido de Bruno (04/11/2026): cada vendedor tiene UN color fijo para todos los días (el que tenía el lunes; no se repite)
+my %COLOR_FIJO = map { $_ => $COLOR_DIA{$_}{Lu} } keys %COLOR_DIA;
+# Cambios de día pedidos por Bruno que todavía no están en Gescom: código de cliente => día (Lu Ma Mi Ju Vi).
+# Mandan sobre el día de Gescom: sacarlos de acá cuando Gescom ya los tenga.
+my %CAMBIO_DIA = map { $_ => 'Mi' } qw(3091 4228 3703 4826 4749 4688 3609 24060 22525 4008 841);   # vendedor 53, de jueves a miércoles (04/11/2026)
 my @COLORES = split / /, '#0b84a5 #3cb44b #4363d8 #f58231 #911eb4 #46a5a8 #f032e6 #7a9c00 #d4a017 #008080 #9a6324 #6a3d9a #2f4f4f #000075 #c71585 #17becf #1e90ff #228b22 #8b008b #b8860b #bcbd22 #4b0082 #556b2f #e377c2';
 my %DIA = (L => 'Lu', M => 'Ma', X => 'Mi', J => 'Ju', V => 'Vi');
 my $BASE = 'https://datos-gescom.panelempresas.workers.dev';
@@ -96,6 +101,7 @@ for my $c (@cli) {
   my %r = (c => $cod, n => fixenc($c->{razon_social} || $c->{nombre} || ''), d => fixenc($c->{direccion} // ''), l => $cl, part => $pt,
            t => ($c->{telefono} // ''), v => $c->{ven} + 0, dia => $DIA{ $c->{dias} }, ru => ($c->{ruta} // ''), ola => $c->{latitud} + 0, olo => $c->{longitud} + 0, h => ($e ? $e->{h} // '' : ''), raw => $c);
   $r{t} =~ s/^\s+|\s+$//g;
+  if ($cod =~ /^\s*(\d+)\s*$/ && $CAMBIO_DIA{ $1 + 0 }) { $r{dia} = $CAMBIO_DIA{ $1 + 0 } }
   if ($e && $e->{semilla} && !$e->{fp}) {
     # primera corrida: se adoptan las correcciones hechas a mano si la coordenada de Gescom es la misma del Excel original
     if (defined $e->{ola} && hav($e->{ola}, $e->{olo}, $r{ola}, $r{olo}) < 0.05) { @r{qw(la lo s no)} = @$e{qw(la lo s no)}; $r{fp} = $fp; $cnt{igual}++ }
@@ -161,7 +167,7 @@ printf "Duplicados omitidos: %d · clientes en el mapa: %d\n", $dup // 0, scalar
 # ---------- 5. estado nuevo e index.html ----------
 my %nuevo = map { $_->{c} => { la => 0 + sprintf('%.6f', $_->{la}), lo => 0 + sprintf('%.6f', $_->{lo}), s => $_->{s}, no => $_->{no} // '', h => $_->{h}, fp => $_->{fp} } } values %rec;
 { open my $f, '>:raw', "$DIR/estado.json" or die; print $f $J->encode(\%nuevo) }
-my @vend = map { +{ id => $VENDEDORES[$_], name => ($vnom{ $VENDEDORES[$_] } // "Vendedor $VENDEDORES[$_]"), col => ($COLOR_DIA{ $VENDEDORES[$_] } ? $COLOR_DIA{ $VENDEDORES[$_] }{Lu} : $COLORES[$_ % @COLORES]), ($COLOR_DIA{ $VENDEDORES[$_] } ? (cd => $COLOR_DIA{ $VENDEDORES[$_] }) : ()) } } 0 .. $#VENDEDORES;
+my @vend = map { +{ id => $VENDEDORES[$_], name => ($vnom{ $VENDEDORES[$_] } // "Vendedor $VENDEDORES[$_]"), col => ($COLOR_FIJO{ $VENDEDORES[$_] } // $COLORES[$_ % @COLORES]) } } 0 .. $#VENDEDORES;
 my %hay = map { $_->{v} => 1 } @fin; @vend = grep { $hay{ $_->{id} } } @vend;
 my @data = map { +{ c => $_->{c}, n => $_->{n}, d => $_->{d}, l => $_->{l}, t => $_->{t}, h => $_->{h}, v => $_->{v}, vn => '', dia => $_->{dia}, ru => $_->{ru},
                     la => 0 + sprintf('%.6f', $_->{la}), lo => 0 + sprintf('%.6f', $_->{lo}), s => $_->{s}, no => $_->{no} // '' } } sort { $a->{c} cmp $b->{c} } @fin;
