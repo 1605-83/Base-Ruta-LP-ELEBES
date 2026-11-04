@@ -104,7 +104,7 @@ for my $c (@cli) {
   my %r = (c => $cod, n => fixenc($c->{razon_social} || $c->{nombre} || ''), d => fixenc($c->{direccion} // ''), l => $cl, part => $pt,
            t => ($c->{telefono} // ''), v => $c->{ven} + 0, dia => $DIA{ $c->{dias} }, ru => ($c->{ruta} // ''), ola => $c->{latitud} + 0, olo => $c->{longitud} + 0, h => ($e ? $e->{h} // '' : ''), raw => $c);
   $r{t} =~ s/^\s+|\s+$//g;
-  if ($cod =~ /^\s*(\d+)\s*$/ && $CAMBIO_DIA{ $1 + 0 }) { $r{dia} = $CAMBIO_DIA{ $1 + 0 } }
+  if ($cod =~ /^\s*(\d+)\s*$/ && $CAMBIO_DIA{ $1 + 0 }) { print "Cambio de día $cod: Gescom dice $r{dia}\n"; $r{dia} = $CAMBIO_DIA{ $1 + 0 } }
   if ($e && $e->{semilla} && !$e->{fp}) {
     # primera corrida: se adoptan las correcciones hechas a mano si la coordenada de Gescom es la misma del Excel original
     if (defined $e->{ola} && hav($e->{ola}, $e->{olo}, $r{ola}, $r{olo}) < 0.05) { @r{qw(la lo s no)} = @$e{qw(la lo s no)}; $r{fp} = $fp; $cnt{igual}++ }
