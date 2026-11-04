@@ -38,6 +38,8 @@ my %COLOR_DIA = (
   75 => { Lu => '#808080', Ma => '#ffd8b1', Mi => '#469990', Ju => '#dcbeff', Vi => '#fabed4' },
   76 => { Lu => '#ffd8b1', Ma => '#ff7f7f', Mi => '#e6194b', Ju => '#000000', Vi => '#42d4f4' },
 );
+# Pedido de Bruno (04/11/2026): todos los vendedores del mismo color según el día (manda sobre %COLOR_DIA, que queda por si se vuelve atrás)
+my %COLOR_DE_DIA = (Lu => '#e6194b', Ma => '#1f6feb', Mi => '#2e9e44', Ju => '#f58231', Vi => '#911eb4');
 # Cambios de día pedidos por Bruno que todavía no están en Gescom: código de cliente => día (Lu Ma Mi Ju Vi).
 # Mandan sobre el día de Gescom: sacarlos de acá cuando Gescom ya los tenga.
 my %CAMBIO_DIA = map { $_ => 'Mi' } qw(3091 4228 3703 4826 4749 4688 3609 24060 22525 4008 841);   # vendedor 53, de jueves a miércoles (04/11/2026)
@@ -165,7 +167,7 @@ printf "Duplicados omitidos: %d · clientes en el mapa: %d\n", $dup // 0, scalar
 # ---------- 5. estado nuevo e index.html ----------
 my %nuevo = map { $_->{c} => { la => 0 + sprintf('%.6f', $_->{la}), lo => 0 + sprintf('%.6f', $_->{lo}), s => $_->{s}, no => $_->{no} // '', h => $_->{h}, fp => $_->{fp} } } values %rec;
 { open my $f, '>:raw', "$DIR/estado.json" or die; print $f $J->encode(\%nuevo) }
-my @vend = map { +{ id => $VENDEDORES[$_], name => ($vnom{ $VENDEDORES[$_] } // "Vendedor $VENDEDORES[$_]"), col => ($COLOR_DIA{ $VENDEDORES[$_] } ? $COLOR_DIA{ $VENDEDORES[$_] }{Lu} : $COLORES[$_ % @COLORES]), ($COLOR_DIA{ $VENDEDORES[$_] } ? (cd => $COLOR_DIA{ $VENDEDORES[$_] }) : ()) } } 0 .. $#VENDEDORES;
+my @vend = map { +{ id => $VENDEDORES[$_], name => ($vnom{ $VENDEDORES[$_] } // "Vendedor $VENDEDORES[$_]"), col => $COLOR_DE_DIA{Lu}, cd => \%COLOR_DE_DIA } } 0 .. $#VENDEDORES;
 my %hay = map { $_->{v} => 1 } @fin; @vend = grep { $hay{ $_->{id} } } @vend;
 my @data = map { +{ c => $_->{c}, n => $_->{n}, d => $_->{d}, l => $_->{l}, t => $_->{t}, h => $_->{h}, v => $_->{v}, vn => '', dia => $_->{dia}, ru => $_->{ru},
                     la => 0 + sprintf('%.6f', $_->{la}), lo => 0 + sprintf('%.6f', $_->{lo}), s => $_->{s}, no => $_->{no} // '' } } sort { $a->{c} cmp $b->{c} } @fin;
